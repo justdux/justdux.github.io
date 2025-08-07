@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DuxV2 | Portfolio</title>
+  <style>
+    @import url("https://fonts.googleapis.com/css2?family=Poppins:wght@100;200;300;400;500;600;700;800&display=swap");
+    :host,html {
+        line-height: 1.5;
+        -webkit-text-size-adjust: 100%;
+        -moz-tab-size: 4;
+        -o-tab-size: 4;
+        tab-size: 4;
+        font-family: Poppins,sans-serif;
+        font-feature-settings: normal;
+        font-variation-settings: normal;
+        -webkit-tap-highlight-color: transparent
+    }
+    /* width */
+    ::-webkit-scrollbar {
+      width: 0px;
+    }
+
+    /* Track */
+    ::-webkit-scrollbar-track {
+      opacity: 1;
+    }
+
+    /* Handle */
+    ::-webkit-scrollbar-thumb {
+      background: rgba(25, 140, 255, 0.8);
+      border-radius: 15px;
+    }
+
+    /* Handle on hover */
+    ::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+    body {
+      margin: 0;
+      background: #000;
+      color: #fff;
+      text-align: center;
+    }
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 20px;
+    }
+    .logo {
+      font-size: 1.5rem;
+      font-weight: bold;
+    }
+    h2 {
+        color: #198CFF
+    }
+    nav a {
+      color: white;
+      text-decoration: none;
+      margin-left: 20px;
+      font-weight: bold;
+    }
+    .hero {
+      margin-top: 0px;
+    }
+    .hero h1 {
+      font-size: 3rem;
+      margin: 0;
+    }
+    .hero p {
+      font-size: 1.2rem;
+      margin: 20px 0;
+    }
+    .buttons button {
+      font-family: Poppins,sans-serif;
+      padding: 12px 24px;
+      margin: 10px;
+      font-size: 1.1rem;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      padding: 15px 20px 15px 20px;
+      font-weight: 700;
+    }
+    .primary {
+      background: #198CFF;
+      color: white;
+    }
+    .secondary {
+      background: #101218;
+      color: white;
+    }
+    .stats {
+      display: flex;
+      justify-content: center;
+      margin-top: 20px;
+      margin-bottom: -40px;
+      gap: 15px;
+    }
+    .stat {
+      background: #050505;
+      padding: 5px 15px 5px 15px;
+      border-radius: 15px;
+      border: 1px solid rgba(30, 30, 30, 0.4);
+      width: 40%;
+      max-width: 350px;
+    }
+    .games-section {
+      margin-top: 0px;
+    }
+    .games-container {
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
+      padding: 40px 0;
+      margin-top: -70px;
+    }
+    .game {
+      background: #050505;
+      border-radius: 15px;
+      border: 1px solid rgba(30, 30, 30, 0.4);
+      border-radius: 12px;
+      padding: 20px;
+      width: 200px;
+      text-align: left;
+    }
+    .game img {
+      width: 100%;
+      border-radius: 10px;
+    }
+    .game-title {
+      font-weight: bold;
+      margin: 10px 0 10px;
+    }
+    .game-meta {
+      font-size: 0.9rem;
+      color: #198CFF;
+    }
+    .stat-value {
+        margin-bottom: -15px;
+    }
+    .title2 {
+        color: white;
+        font-size: 2.5rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="logo">DuxV2</div>
+    <nav>
+      <a href="https://justdux.github.io/">Home</a>
+      <a href="https://justdux.github.io/games.html">Games</a>
+    </nav>
+  </header>
+  <script>
+document.addEventListener("DOMContentLoaded", async () => {
+  const gameElements = document.querySelectorAll(".game");
+  const universeIds = Array.from(gameElements).map(el => el.dataset.universeId).filter(Boolean);
+  if (universeIds.length === 0) return;
+
+  const statsEl = {
+    players: document.querySelector(".stat-players"),
+    sessions: document.querySelector(".stat-visits")
+  };
+
+  const FIVE_MINUTES = 5 * 60 * 1000;
+  const STATS_CACHE_KEY = "duxv2_game_data";
+  const ICONS_CACHE_KEY = "duxv2_icon_data";
+  const TIMESTAMP_KEY = "duxv2_last_update";
+
+  let useCache = false;
+  const lastUpdate = localStorage.getItem(TIMESTAMP_KEY);
+  const cachedStats = localStorage.getItem(STATS_CACHE_KEY);
+  const cachedIcons = localStorage.getItem(ICONS_CACHE_KEY);
+
+  if (lastUpdate && cachedStats && cachedIcons) {
+    const elapsed = Date.now() - Number(lastUpdate);
+    useCache = elapsed < FIVE_MINUTES;
+  }
+
+  let statsJson, iconsJson;
+  if (useCache) {
+    statsJson = JSON.parse(cachedStats);
+    iconsJson = JSON.parse(cachedIcons);
+  } else {
+    try {
+      const [statsRes, iconsRes] = await Promise.all([
+        fetch(`https://games.roproxy.com/v1/games?universeIds=${universeIds.join(",")}`),
+        fetch(`https://thumbnails.roproxy.com/v1/games/icons?universeIds=${universeIds.join(",")}&size=420x420&format=Png`)
+      ]);
+
+      statsJson = await statsRes.json();
+      iconsJson = await iconsRes.json();
+
+      localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(statsJson));
+      localStorage.setItem(ICONS_CACHE_KEY, JSON.stringify(iconsJson));
+      localStorage.setItem(TIMESTAMP_KEY, Date.now().toString());
+    } catch (err) {
+      console.error("Failed to fetch data:", err);
+      gameElements.forEach(el => {
+        const metaEl = el.querySelector(".game-meta");
+        metaEl.textContent = "Error loading stats";
+      });
+      return;
+    }
+  }
+
+  const statsById = {};
+  statsJson.data.forEach(game => statsById[game.id] = game);
+
+  const iconsById = {};
+  iconsJson.data.forEach(icon => iconsById[icon.targetId] = icon.imageUrl);
+
+  let totalPlayers = 0;
+  let totalVisits = 0;
+
+  const gamesContainer = document.querySelector(".games-container");
+  const gamesWithData = [];
+
+  gameElements.forEach(el => {
+    const universeId = el.dataset.universeId;
+    const gameData = statsById[universeId];
+    const iconUrl = iconsById[universeId];
+    const metaEl = el.querySelector(".game-meta");
+    const imgEl = el.querySelector("img");
+
+    if (iconUrl) imgEl.src = iconUrl;
+
+    if (gameData) {
+      const playing = gameData.playing;
+      const visits = gameData.visits;
+      totalPlayers += playing;
+      totalVisits += visits;
+
+      metaEl.innerHTML = `
+        <strong>${playing.toLocaleString()} active players</strong><br>
+        <div style="color: white; font-weight: normal;">${visits.toLocaleString()} visits</div>
+      `;
+
+      gamesWithData.push({ el, playing });
+    } else {
+      metaEl.textContent = "Data not found";
+    }
+  });
+
+  // Sort descending by active players
+  gamesWithData.sort((a, b) => b.playing - a.playing);
+
+  // Clear and re-append in sorted order
+  gamesContainer.innerHTML = "";
+  gamesWithData.forEach(game => gamesContainer.appendChild(game.el));
+
+  statsEl.players.textContent = totalPlayers.toLocaleString();
+  statsEl.sessions.textContent = totalVisits.toLocaleString();
+});
+  </script>
+  <section class="games-section" id="games">
+    <h2 class="title2">My Games</h2>
+    <div class="games-container">
+      <div class="game" data-universe-id="8125621001">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRkvADMbbH2FKIvRwK9685N3ZdBIYbkzAIaCA&s" alt="Game Thumbnail">
+        <div class="game-title">My Singing Garden</div>
+        <div class="game-meta" style="font-weight: bold;">??? active players<br><div style="color: white; font-weight: normal;">??? visits</div></div>
+      </div>
+      <div class="game" data-universe-id="7999303512">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRkvADMbbH2FKIvRwK9685N3ZdBIYbkzAIaCA&s" alt="Game Thumbnail">
+        <div class="game-title">Steal a Rapper</div>
+        <div class="game-meta" style="font-weight: bold;">??? active players<br><div style="color: white; font-weight: normal;">??? visits</div></div>
+      </div>
+      <div class="game" data-universe-id="7552829228">
+        <img src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRkvADMbbH2FKIvRwK9685N3ZdBIYbkzAIaCA&s" alt="Game Thumbnail">
+        <div class="game-title">Dead Defense</div>
+        <div class="game-meta" style="font-weight: bold;">??? active players<br><div style="color: white; font-weight: normal;">??? visits</div></div>
+      </div>
+    </div>
+  </section>
+</body>
+</html>
