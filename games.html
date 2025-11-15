@@ -63,44 +63,73 @@
 
     document.addEventListener("DOMContentLoaded", init);
 
-    async function init() {
-      if (!UNIVERSE_IDS.length) return;
+    async function fetchDataWithRetry(url, retries = 3, delay = 1000) {
+  try {
+    const response = await fetch(url);
+    if (response.ok) {
+      return await response.json();
+    } else {
+      throw new Error('Failed to fetch');
+    }
+  } catch (error) {
+    if (retries > 0) {
+      console.warn(`Retrying in ${delay}ms...`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+      return fetchDataWithRetry(url, retries - 1, delay * 2); // Exponentially increase the delay
+    } else {
+      throw new Error('Max retries reached');
+    }
+  }
+}
 
-      const listEl = document.getElementById("games-container");
+async function init() {
+  if (!UNIVERSE_IDS.length) return;
 
-      const FIVE_MINUTES = 5 * 60 * 1000;
-      const STATS_CACHE_KEY = "duxv2_game_data";
-      const ICONS_CACHE_KEY = "duxv2_icon_data";
-      const TIMESTAMP_KEY  = "duxv2_last_update";
+  const statsEl = {
+    players: document.querySelector(".stat-players"),
+    visits: document.querySelector(".stat-visits"),
+    updated: document.getElementById("last-updated"),
+    list: document.getElementById("games-container"),
+  };
 
-      let useCache = false;
-      const lastUpdate = localStorage.getItem(TIMESTAMP_KEY);
-      const cachedStats = localStorage.getItem(STATS_CACHE_KEY);
-      const cachedIcons = localStorage.getItem(ICONS_CACHE_KEY);
-      if (lastUpdate && cachedStats && cachedIcons) {
-        useCache = (Date.now() - Number(lastUpdate)) < FIVE_MINUTES;
-      }
+  const FIVE_MINUTES = 5 * 60 * 1000;
+  const STATS_CACHE_KEY = "duxv2_game_data";
+  const ICONS_CACHE_KEY = "duxv2_icon_data";
+  const TIMESTAMP_KEY = "duxv2_last_update";
 
-      let statsJson, iconsJson;
-      try {
-        if (useCache) {
-          statsJson = JSON.parse(cachedStats);
-          iconsJson = JSON.parse(cachedIcons);
-        } else {
-          const [statsRes, iconsRes] = await Promise.all([
-            fetch(`https://games.roproxy.com/v1/games?universeIds=${UNIVERSE_IDS.join(",")}`),
-            fetch(`https://thumbnails.roproxy.com/v1/games/icons?universeIds=${UNIVERSE_IDS.join(",")}&size=420x420&format=Png`)
-          ]);
-          statsJson = await statsRes.json();
-          iconsJson = await iconsRes.json();
-          localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(statsJson));
-          localStorage.setItem(ICONS_CACHE_KEY, JSON.stringify(iconsJson));
-          localStorage.setItem(TIMESTAMP_KEY, Date.now().toString());
-        }
-      } catch (err) {
-        console.error("Failed to fetch data:", err);
-        return;
-      }
+  let useCache = false;
+  const lastUpdate = localStorage.getItem(TIMESTAMP_KEY);
+  const cachedStats = localStorage.getItem(STATS_CACHE_KEY);
+  const cachedIcons = localStorage.getItem(ICONS_CACHE_KEY);
+
+  if (lastUpdate && cachedStats && cachedIcons) {
+    const elapsed = Date.now() - Number(lastUpdate);
+    useCache = elapsed < FIVE_MINUTES;
+  }
+
+  let statsJson, iconsJson;
+  try {
+    if (useCache) {
+      statsJson = JSON.parse(cachedStats);
+      iconsJson = JSON.parse(cachedIcons);
+    } else {
+      const [statsRes, iconsRes] = await Promise.all([
+        fetchDataWithRetry(`https://games.roproxy.com/v1/games?universeIds=${UNIVERSE_IDS.join(",")}`),
+        fetchDataWithRetry(`https://thumbnails.roproxy.com/v1/games/icons?universeIds=${UNIVERSE_IDS.join(",")}&size=420x420&format=Png`)
+      ]);
+
+      statsJson = statsRes;
+      iconsJson = iconsRes;
+
+      localStorage.setItem(STATS_CACHE_KEY, JSON.stringify(statsJson));
+      localStorage.setItem(ICONS_CACHE_KEY, JSON.stringify(iconsJson));
+      localStorage.setItem(TIMESTAMP_KEY, Date.now().toString());
+    }
+  } catch (err) {
+    console.error("Failed to fetch data:", err);
+    statsEl.updated.textContent = "Error loading stats";
+    return;
+  }
 
       const statsById = Object.create(null);
       (statsJson?.data ?? []).forEach(g => statsById[g.id] = g);
